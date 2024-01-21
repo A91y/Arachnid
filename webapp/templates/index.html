@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hateful Files</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        body {
+            background-color: #1c1c1c; /* Dark background color */
+            color: #ffffff; /* Light text color */
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 80%;
+            margin: 20px auto;
+            background-color: #2d2d2d; /* Dark table background color */
+            color: #ffffff; /* Light table text color */
+        }
+
+        th, td {
+            border: 1px solid #333; /* Dark border color */
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #4d4d4d; /* Dark header background color */
+        }
+
+        .container {
+            background-color: #333; /* Dark container background color */
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body class="bg-dark text-light">
+    <div class="container">
+        <h2 class="mt-4 mb-4">Analysed Data</h2>
+        <div class="mb-3">
+            <button onclick="filterData('all');window.location.reload();" class="btn btn-secondary">All</button>
+            <button onclick="filterData('hateful')" class="btn btn-danger">Hateful</button>
+            <button onclick="filterData('not_hateful')" class="btn btn-success">Not Hateful</button>
+            <button onclick="toggleSockets()" class="btn btn-info float-end" id="sockets-toggle">Sockets On</button>
+        </div>
+        <table class="table table-striped table-bordered">
+            <thead class="thead-light">
+                <tr>
+                    <th>Filename</th>
+                    <th>HATESPEECH</th>
+                    <th>Category</th>
+                </tr>
+            </thead>
+            <tbody id="data-body">
+                {% for row in data %}
+                <tr class="data-row" data-hateful="{{ row[1] }}">
+                    <td><a href="{{ url_for('view_file', filename=row[0]) }}">{{ row[0] }}</a></td>
+                    <td>{{ row[1] }}</td>
+                    <td>{{ row[2] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Bootstrap JS and Popper.js (required for Bootstrap components) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        var socket = io.connect("http://" + document.domain + ":" + location.port);
+        var socketsEnabled = getStoredSocketsSetting();
+        var socketsToggleBtn = document.getElementById("sockets-toggle");
+
+        updateToggleButtonText();
+
+        socket.on("connect", function () {
+            socket.emit("update_data");
+        });
+
+        socket.on("data_updated", function (msg) {
+            if (socketsEnabled) {
+                updateTable(msg.data);
+            }
+        });
+
+        function updateTable(data) {
+            var tbody = document.getElementById("data-body");
+
+            // Check if tbody is not null before updating
+            if (tbody) {
+                tbody.innerHTML = "";
+
+                for (var i = 0; i < data.length; i++) {
+                    var row =
+                        '<tr class="data-row" data-hateful="' +
+                        data[i][1] +
+                        '"><td><a href="/archive/' +
+                        data[i][0] +
+                        '">' +
+                        data[i][0] +
+                        "</a></td><td>" +
+                        data[i][1] +
+                        "</td><td>" +
+                        data[i][2] +
+                        "</td></tr>";
+                    tbody.innerHTML += row;
+                }
+            }
+        }
+
+        function filterData(filter) {
+            var rows = document.getElementsByClassName("data-row");
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                var isHateful = row.getAttribute("data-hateful") === "HATEFUL";
+
+                if (filter === "all" || (filter === "hateful" && isHateful) || (filter === "not_hateful" && !isHateful)) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+
+                // Disable sockets after filtering
+                socketsEnabled = false;
+                storeSocketsSetting(socketsEnabled);
+                updateToggleButtonText();
+            }
+        }
+
+        function toggleSockets() {
+            socketsEnabled = !socketsEnabled;
+            storeSocketsSetting(socketsEnabled);
+            updateToggleButtonText();
+        }
+
+        function storeSocketsSetting(enabled) {
+            localStorage.setItem("socketsEnabled", enabled);
+        }
+
+        function getStoredSocketsSetting() {
+            var storedSetting = localStorage.getItem("socketsEnabled");
+            return storedSetting === "true"; // Convert to boolean
+        }
+
+        function updateToggleButtonText() {
+            if (socketsEnabled) {
+                socketsToggleBtn.innerText = "Sockets On";
+            } else {
+                socketsToggleBtn.innerText = "Sockets Off";
+            }
+        }
+    </script>
+</body>
+</html>
